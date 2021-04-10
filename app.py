@@ -123,7 +123,6 @@ def parse_date_from_text():
 
 
 if __name__ == '__main__':
-    pass
     # res = parse_date("встреча с васенькой завтра в 17:00 до 16:00 ")
     # print(res)
     app.run()
