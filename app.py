@@ -137,7 +137,7 @@ def parse_date(text: str, timezone: str):
     return {}
 
 
-@app.route('/api/v1/parse/event', methods=['GET'])
+@app.route('/api/v1/parse/event', methods=['PUT'])
 def parse_event_text():
     json_text = request.json
 
@@ -169,7 +169,7 @@ def transform_midday_midnight(text: str, timezone: str) -> str:
     return text.strip()
 
 
-@app.route('/api/v1/parse/date', methods=['GET'])
+@app.route('/api/v1/parse/date', methods=['PUT'])
 def parse_date_from_text():
     json_text = request.json
 
