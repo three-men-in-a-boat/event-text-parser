@@ -1,6 +1,7 @@
 from flask import Flask, request
 import dateparser
 import datetime
+from dateutil import tz
 import re
 from dateparser.search import search_dates
 
@@ -23,13 +24,13 @@ spaces_re = re.compile(r"\s+")
 
 
 def get_text_and_timezone(json_text: dict) -> (str, str):
-    timezone = str(json_text.get("timezone", "UTC"))
-    if timezone == "":
-        timezone = default_timezone
+    timezone_str = str(json_text.get("timezone", "UTC"))
+    if timezone_str == "":
+        timezone_str = default_timezone
 
-    text = json_text.get("text", "")
+    text = str(json_text.get("text", ""))
 
-    return text, timezone
+    return text, timezone_str
 
 
 def pre_parse(text: str) -> str:
@@ -44,10 +45,10 @@ def pre_parse(text: str) -> str:
     return text
 
 
-def parse_date(text: str, timezone: str):
+def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
     text = pre_parse(text)
 
-    dates = dateparser.search.search_dates(text, settings={"TIMEZONE": timezone})
+    dates = dateparser.search.search_dates(text)
     if dates is None:
         return {}
 
@@ -75,7 +76,7 @@ def parse_date(text: str, timezone: str):
             text = text.replace(datemonth_string, replace_str, 1)
 
         text = spaces_re.sub(" ", text).strip()
-        dates = dateparser.search.search_dates(text, settings={"TIMEZONE": timezone})
+        dates = dateparser.search.search_dates(text)
         if dates is None:
             return {}
 
@@ -83,16 +84,17 @@ def parse_date(text: str, timezone: str):
         date_str = dates[0][0]
 
         updated_date_str = prepositions_re.sub(" в ", date_str)
-        dates = dateparser.search.search_dates(updated_date_str, settings={"TIMEZONE": timezone})
+        dates = dateparser.search.search_dates(updated_date_str)
 
         event_start = dates[0][1]
         event_name = text.replace(date_str, '').strip()
 
         event_name = prepositions_in_end_cleanup_re.sub("", event_name)
+        event_start_tz = event_start.astimezone(parsed_tz)
 
         return {
             "event_name": event_name,
-            "event_start": event_start.isoformat(),
+            "event_start": event_start_tz.isoformat(),
             "event_end": None,
         }
 
@@ -107,7 +109,7 @@ def parse_date(text: str, timezone: str):
 
         updated_date_str = start_re.sub(" в ", date_str)
 
-        dates = dateparser.search.search_dates(updated_date_str, settings={"TIMEZONE": timezone})
+        dates = dateparser.search.search_dates(updated_date_str)
         first_date = dates[0]
         second_date = dates[1]
 
@@ -128,10 +130,13 @@ def parse_date(text: str, timezone: str):
 
         event_name = prepositions_in_end_cleanup_re.sub("", event_name)
 
+        event_start_tz = event_start.astimezone(parsed_tz)
+        event_end_tz = event_end.astimezone(parsed_tz)
+
         return {
             "event_name": event_name,
-            "event_start": event_start.isoformat(),
-            "event_end": event_end.isoformat(),
+            "event_start": event_start_tz.isoformat(),
+            "event_end": event_end_tz.isoformat(),
         }
 
     return {}
@@ -141,11 +146,18 @@ def parse_date(text: str, timezone: str):
 def parse_event_text():
     json_text = request.json
 
-    text, timezone = get_text_and_timezone(json_text)
+    text, timezone_str = get_text_and_timezone(json_text)
+
+    parsed_tz: datetime.tzinfo = tz.gettz(timezone_str)
+    if parsed_tz is None:
+        return {
+                   "error": "invalid_timezone",
+                   "error_description": f"invalid timezone '{timezone_str}'"
+               }, 400
 
     datejson = {}
     try:
-        datejson = parse_date(text, timezone)
+        datejson = parse_date(text, parsed_tz)
     except Exception as e:
         app.logger.error(e)
 
@@ -156,15 +168,15 @@ date_prepositions_re = re.compile(r"(^|\s)+(начиная с|начиная|с|
 midday_midnight_re = re.compile(r"(^|\s)+пол(удня|удню|день|дня|дню|уночь|уночи|ночью|ночь|ночи|)($|\s)+")
 
 
-def transform_midday_midnight(text: str, timezone: str) -> str:
+def transform_midday_midnight(text: str) -> str:
     res = midday_midnight_re.search(text)
     if res is None:
         return text
     word = res.group().strip()
     if "дн" in word or "ден" in word:
-        text = midday_midnight_re.sub(f" 12:00 {timezone} ", text)
+        text = midday_midnight_re.sub(" 12:00 ", text)
     elif "ноч" in word:
-        text = midday_midnight_re.sub(f" 00:00 {timezone}", text)
+        text = midday_midnight_re.sub(" 00:00 ", text)
 
     return text.strip()
 
@@ -173,17 +185,29 @@ def transform_midday_midnight(text: str, timezone: str) -> str:
 def parse_date_from_text():
     json_text = request.json
 
-    text, timezone = get_text_and_timezone(json_text)
+    text, timezone_str = get_text_and_timezone(json_text)
+
+    parsed_tz: datetime.tzinfo = tz.gettz(timezone_str)
+    if parsed_tz is None:
+        return {
+                   "error": "invalid_timezone",
+                   "error_description": f"invalid timezone '{timezone_str}'"
+               }, 400
 
     text = pre_parse(text)
     text = date_prepositions_re.sub(" в ", text)
-    text = transform_midday_midnight(text, timezone)
+    text = transform_midday_midnight(text)
 
-    date: datetime.datetime = dateparser.parse(text, settings={"TIMEZONE": timezone})
-    datestr = date.isoformat() if date is not None else None
+    date: datetime.datetime = dateparser.parse(text)
+    if date is None:
+        return {
+            "date": None
+        }
+
+    date_with_tz = date.astimezone(parsed_tz)
 
     return {
-        "date": datestr
+        "date": date_with_tz.isoformat()
     }
 
 
