@@ -9,16 +9,16 @@ app = Flask(__name__)
 
 default_timezone = "UTC"
 
-pre_re = re.compile(r"\s+(начиная с|начиная в|начиная)\s+")
-pre_check_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+\d+")
-pre_begin_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+")
+# pre_re = re.compile(r"\s+(начиная с|начиная в|начиная)\s+", re.IGNORECASE)
+pre_check_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+\d+", re.IGNORECASE)
+pre_begin_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+", re.IGNORECASE)
 
-end_re = re.compile(r"\s+(до|по)\s+")
-start_re = re.compile(r"\s+(начиная с|начиная в|начиная|с|в)\s+")
-prepositions_re = re.compile(r"\s+(начиная с|начиная|с|в|до|по)\s+")
-prepositions_in_end_cleanup_re = re.compile(r"\s+(начиная с|начиная|с|в|на|до|по)$")
+end_re = re.compile(r"\s+(до|по)\s+", re.IGNORECASE)
+start_re = re.compile(r"\s+(начиная с|начиная в|начиная|с|в)\s+", re.IGNORECASE)
+prepositions_re = re.compile(r"\s+(начиная с|начиная|с|в|до|по)\s+", re.IGNORECASE)
+prepositions_in_end_cleanup_re = re.compile(r"\s+(начиная с|начиная|с|в|на|до|по)$", re.IGNORECASE)
 
-days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завтра|послезавтра)\s+")
+days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завтра|послезавтра)\s+", re.IGNORECASE)
 
 spaces_re = re.compile(r"\s+")
 
@@ -35,13 +35,13 @@ def get_text_and_timezone(json_text: dict) -> (str, str):
 
 def pre_parse(text: str) -> str:
     text = spaces_re.sub(" ", text).strip()
-    text = pre_re.sub(" в ", text)
+    # text = pre_re.sub(" в ", text)
 
     matches = pre_check_re.search(text)
     if matches is not None:
         text = pre_begin_re.sub(" в ", text, 1)
 
-    return text
+    return text.strip()
 
 
 def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
@@ -56,10 +56,12 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
         month = dates[0][0]
         # сходить до вечера полить огород с 22 марта 14:00 по 22 марта 20:00
         # out: " с 22 марта"
-        match_preposition_before_month = re.search(rf"(^|\s)+(до|по|на|с|в)\s+\d+\s+{month}($|\s)+", text)
+        match_preposition_before_month = re.search(rf"(^|\s)+(до|по|на|с|в)\s+\d+\s+{month}($|\s)+", text,
+                                                   re.IGNORECASE)
         # сходить до вечера полить огород 22 марта с 14:00 по 20:00
         # out: "22 марта с"
-        match_preposition_after_month = re.search(rf"(^|\s)+\d+\s+{month}\s+(до|по|на|с|в)($|\s)+", text)
+        match_preposition_after_month = re.search(rf"(^|\s)+\d+\s+{month}\s+(до|по|на|с|в)($|\s)+", text,
+                                                  re.IGNORECASE)
         if match_preposition_before_month is None and match_preposition_after_month is None:
             return {}
 
@@ -163,8 +165,9 @@ def parse_event_text():
     return datejson
 
 
-date_prepositions_re = re.compile(r"(^|\s)+(начиная с|начиная|с|в|до|по)\s+")
-midday_midnight_re = re.compile(r"(^|\s)+пол(удня|удню|день|дня|дню|уночь|уночи|ночью|ночь|ночи|)($|\s)+")
+date_prepositions_re = re.compile(r"(^|\s)+(начиная с|начиная|с|в|до|по)\s+", re.IGNORECASE)
+midday_midnight_re = re.compile(r"(^|\s)+пол(удня|удню|день|дня|дню|уночь|уночи|ночью|ночь|ночи|)($|\s)+",
+                                re.IGNORECASE)
 
 
 def transform_midday_midnight(text: str) -> str:
