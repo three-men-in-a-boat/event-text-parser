@@ -15,6 +15,7 @@ pre_begin_re = re.compile(r"^\s*(начиная с|начиная в|начин�
 end_re = re.compile(r"\s+(до|по)\s+")
 start_re = re.compile(r"\s+(начиная с|начиная в|начиная|с|в)\s+")
 prepositions_re = re.compile(r"\s+(начиная с|начиная|с|в|до|по)\s+")
+prepositions_in_end_cleanup_re = re.compile(r"\s+(начиная с|начиная|с|в|на|до|по)$")
 
 days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завтра|послезавтра)\s+")
 
@@ -50,6 +51,34 @@ def parse_date(text: str, timezone: str):
     if dates is None:
         return {}
 
+    # TODO(nickeskov): I know, it's awful...
+    if len(dates) > 2:
+        month = dates[0][0]
+        # сходить до вечера полить огород с 22 марта 14:00 по 22 марта 20:00
+        # out: " с 22 марта"
+        match_preposition_before_month = re.search(rf"(^|\s)+(до|по|на|с|в)\s+\d+\s+{month}($|\s)+", text)
+        # сходить до вечера полить огород 22 марта с 14:00 по 20:00
+        # out: "22 марта с"
+        match_preposition_after_month = re.search(rf"(^|\s)+\d+\s+{month}\s+(до|по|на|с|в)($|\s)+", text)
+        if match_preposition_before_month is None and match_preposition_after_month is None:
+            return {}
+
+        if match_preposition_before_month is not None:
+            datemonth_string = match_preposition_before_month.group()
+            replace_str = f" {' '.join(datemonth_string.split()[1:])} "
+            text = text.replace(datemonth_string, replace_str, 1)
+
+        if match_preposition_after_month is not None:
+            datemonth_string = match_preposition_after_month.group()
+            split = datemonth_string.split()
+            replace_str = f" {' '.join(split[:len(split) - 1])} "
+            text = text.replace(datemonth_string, replace_str, 1)
+
+        text = spaces_re.sub(" ", text).strip()
+        dates = dateparser.search.search_dates(text, settings={"TIMEZONE": timezone})
+        if dates is None:
+            return {}
+
     if len(dates) == 1:
         date_str = dates[0][0]
 
@@ -58,6 +87,8 @@ def parse_date(text: str, timezone: str):
 
         event_start = dates[0][1]
         event_name = text.replace(date_str, '').strip()
+
+        event_name = prepositions_in_end_cleanup_re.sub("", event_name)
 
         return {
             "event_name": event_name,
@@ -75,6 +106,7 @@ def parse_date(text: str, timezone: str):
         event_name = text.replace(date_str, '').strip()
 
         updated_date_str = start_re.sub(" в ", date_str)
+
         dates = dateparser.search.search_dates(updated_date_str, settings={"TIMEZONE": timezone})
         first_date = dates[0]
         second_date = dates[1]
@@ -93,6 +125,8 @@ def parse_date(text: str, timezone: str):
 
         if event_end < event_start:
             event_start, event_end = event_end, event_start
+
+        event_name = prepositions_in_end_cleanup_re.sub("", event_name)
 
         return {
             "event_name": event_name,
