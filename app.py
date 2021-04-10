@@ -37,9 +37,8 @@ def pre_parse(text: str) -> str:
     text = spaces_re.sub(" ", text).strip()
     text = pre_re.sub(" в ", text)
 
-    matches = pre_check_re.findall(text)
-
-    if len(matches) != 0:
+    matches = pre_check_re.search(text)
+    if matches is not None:
         text = pre_begin_re.sub(" в ", text, 1)
 
     return text
@@ -113,11 +112,11 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
         first_date = dates[0]
         second_date = dates[1]
 
-        if len(end_re.findall(updated_date_str)) == 0:
+        if end_re.search(updated_date_str) is None:
             return {}
 
         event_date: datetime.date = first_date[1].date()
-        if len(days_re.findall(updated_date_str)) != 0:
+        if days_re.search(updated_date_str) is not None:
             event_first_date = first_date[1].date()
             event_second_date = second_date[1].date()
             event_date = max(event_first_date, event_second_date)
