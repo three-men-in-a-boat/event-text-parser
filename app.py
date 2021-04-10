@@ -6,7 +6,6 @@ from dateparser.search import search_dates
 
 app = Flask(__name__)
 
-
 pre_re = re.compile(r"\s+(начиная с|начиная в|начиная)\s+")
 pre_check_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+\d+")
 pre_begin_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+")
@@ -20,14 +19,20 @@ days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завт
 spaces_re = re.compile(r"\s+")
 
 
-def parse_date(text: str):
+def pre_parse(text: str) -> str:
     text = spaces_re.sub(" ", text).strip()
     text = pre_re.sub(" в ", text)
 
-    kek = pre_check_re.findall(text)
+    matches = pre_check_re.findall(text)
 
-    if len(kek) != 0:
+    if len(matches) != 0:
         text = pre_begin_re.sub(" в ", text, 1)
+
+    return text
+
+
+def parse_date(text: str):
+    text = pre_parse(text)
 
     dates = dateparser.search.search_dates(text)
     if dates is None:
@@ -86,7 +91,7 @@ def parse_date(text: str):
     return {}
 
 
-@app.route('/api/v1/parse-event', methods=['GET'])
+@app.route('/api/v1/parse/event', methods=['GET'])
 def parse_event_text():
     json_text = request.json
     text = str(json_text["text"])
@@ -97,6 +102,24 @@ def parse_event_text():
         app.logger.error(e)
 
     return datejson
+
+
+date_prepositions_re = re.compile(r"(^|\s)+(начиная с|начиная|с|в|до|по)\s+")
+
+
+@app.route('/api/v1/parse/date', methods=['GET'])
+def parse_date_from_text():
+    json_text = request.json
+    text = str(json_text["text"])
+    text = pre_parse(text)
+    text = date_prepositions_re.sub(" в ", text)
+
+    date: datetime.datetime = dateparser.parse(text)
+    datestr = date.isoformat() if date is not None else None
+
+    return {
+        "date": datestr
+    }
 
 
 if __name__ == '__main__':
