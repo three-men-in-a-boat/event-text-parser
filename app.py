@@ -87,11 +87,11 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
         updated_date_str = prepositions_re.sub(" в ", date_str)
         dates = dateparser.search.search_dates(updated_date_str)
 
-        event_start = dates[0][1]
+        event_start_tz = dates[0][1]
         event_name = text.replace(date_str, '').strip()
 
         event_name = prepositions_in_end_cleanup_re.sub("", event_name)
-        event_start_tz = event_start.astimezone(parsed_tz)
+        event_start_tz = datetime.datetime.combine(event_start_tz.date(), event_start_tz.time(), parsed_tz)
 
         return {
             "event_name": event_name,
@@ -123,16 +123,17 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
             event_second_date = second_date[1].date()
             event_date = max(event_first_date, event_second_date)
 
-        event_start: datetime.datetime = datetime.datetime.combine(event_date, first_date[1].time())
-        event_end: datetime.datetime = datetime.datetime.combine(event_date, second_date[1].time())
+        event_start_tz: datetime.datetime = datetime.datetime.combine(
+            event_date, first_date[1].time(), parsed_tz
+        )
+        event_end_tz: datetime.datetime = datetime.datetime.combine(
+            event_date, second_date[1].time(), parsed_tz
+        )
 
-        if event_end < event_start:
-            event_start, event_end = event_end, event_start
+        if event_end_tz < event_start_tz:
+            event_start_tz, event_end_tz = event_end_tz, event_start_tz
 
         event_name = prepositions_in_end_cleanup_re.sub("", event_name)
-
-        event_start_tz = event_start.astimezone(parsed_tz)
-        event_end_tz = event_end.astimezone(parsed_tz)
 
         return {
             "event_name": event_name,
@@ -206,7 +207,7 @@ def parse_date_from_text():
             "date": None
         }
 
-    date_with_tz = date.astimezone(parsed_tz)
+    date_with_tz = datetime.datetime.combine(date.date(), date.time(), parsed_tz)
 
     return {
         "date": date_with_tz.isoformat()
