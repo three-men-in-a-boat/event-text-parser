@@ -51,8 +51,7 @@ def pre_parse(text: str) -> str:
     text = spaces_re.sub(" ", text).strip()
     # text = pre_re.sub(" в ", text)
 
-    matches = pre_check_re.search(text)
-    if matches is not None:
+    if pre_check_re.search(text) is not None:
         text = pre_begin_re.sub(" в ", text, 1)
 
     text = time_prep_transform(text)
@@ -65,7 +64,9 @@ def pre_parse(text: str) -> str:
 def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
     text = pre_parse(text)
 
-    dates = dateparser.search.search_dates(text)
+    timezone_str = parsed_tz.tzname(datetime.datetime.now())
+
+    dates = dateparser.search.search_dates(text, settings={'TIMEZONE': timezone_str})
     if dates is None:
         return {}
 
@@ -95,7 +96,7 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
             text = text.replace(datemonth_string, replace_str, 1)
 
         text = spaces_re.sub(" ", text).strip()
-        dates = dateparser.search.search_dates(text)
+        dates = dateparser.search.search_dates(text, settings={'TIMEZONE': timezone_str})
         if dates is None:
             return {}
 
@@ -103,7 +104,7 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
         date_str = dates[0][0]
 
         updated_date_str = prepositions_re.sub(" в ", date_str)
-        dates = dateparser.search.search_dates(updated_date_str)
+        dates = dateparser.search.search_dates(updated_date_str, settings={'TIMEZONE': timezone_str})
 
         event_start_tz = dates[0][1]
         event_name = text.replace(date_str, '').strip()
@@ -128,7 +129,7 @@ def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
 
         updated_date_str = start_re.sub(" в ", date_str)
 
-        dates = dateparser.search.search_dates(updated_date_str)
+        dates = dateparser.search.search_dates(updated_date_str, settings={'TIMEZONE': timezone_str})
         first_date = dates[0]
         second_date = dates[1]
 
@@ -219,7 +220,7 @@ def parse_date_from_text():
     text = date_prepositions_re.sub(" в ", text)
     text = transform_midday_midnight(text)
 
-    date: datetime.datetime = dateparser.parse(text)
+    date: datetime.datetime = dateparser.parse(text, settings={"TIMEZONE": timezone_str})
     if date is None:
         return {
             "date": None
