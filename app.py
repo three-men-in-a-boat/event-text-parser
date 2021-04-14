@@ -22,6 +22,8 @@ days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завт
 
 spaces_re = re.compile(r"\s+")
 
+time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|на)\s+\d{1,2}:\d{1,2}", re.IGNORECASE)
+
 
 def get_text_and_timezone(json_text: dict) -> (str, str):
     timezone_str = str(json_text.get("timezone", "UTC"))
@@ -33,6 +35,18 @@ def get_text_and_timezone(json_text: dict) -> (str, str):
     return text, timezone_str
 
 
+def time_prep_transform(text: str) -> str:
+    arr = time_prep_re.findall(text)
+    for time_preposition_str in arr:
+        time_preposition_str = " " + time_preposition_str[1] + " "
+
+        repl = prepositions_re.sub(" в ", time_preposition_str)
+
+        text = text.replace(time_preposition_str, repl)
+
+    return text
+
+
 def pre_parse(text: str) -> str:
     text = spaces_re.sub(" ", text).strip()
     # text = pre_re.sub(" в ", text)
@@ -40,6 +54,10 @@ def pre_parse(text: str) -> str:
     matches = pre_check_re.search(text)
     if matches is not None:
         text = pre_begin_re.sub(" в ", text, 1)
+
+    text = time_prep_transform(text)
+
+    text = spaces_re.sub(" ", text)
 
     return text.strip()
 
