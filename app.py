@@ -9,10 +9,6 @@ app = Flask(__name__)
 
 default_timezone = "UTC"
 
-# pre_re = re.compile(r"\s+(начиная с|начиная в|начиная)\s+", re.IGNORECASE)
-pre_check_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+\d+", re.IGNORECASE)
-pre_begin_re = re.compile(r"^\s*(начиная с|начиная в|начиная|с|в|по|до)\s+", re.IGNORECASE)
-
 end_re = re.compile(r"\s+(до|по)\s+", re.IGNORECASE)
 start_re = re.compile(r"\s+(начиная с|начиная в|начиная|с|в)\s+", re.IGNORECASE)
 prepositions_re = re.compile(r"\s+(начиная с|начиная|с|в|до|по)\s+", re.IGNORECASE)
@@ -22,11 +18,11 @@ days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завт
 
 spaces_re = re.compile(r"\s+")
 
-time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|на)\s+\d{1,2}:\d{1,2}", re.IGNORECASE)
+time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|на)(\s+\d{1,2}:\d{1,2})", re.IGNORECASE)
 
 
 def get_text_and_timezone(json_text: dict) -> (str, str):
-    timezone_str = str(json_text.get("timezone", "UTC"))
+    timezone_str = str(json_text.get("timezone", default_timezone))
     if timezone_str == "":
         timezone_str = default_timezone
 
@@ -35,30 +31,14 @@ def get_text_and_timezone(json_text: dict) -> (str, str):
     return text, timezone_str
 
 
-def time_prep_transform(text: str) -> str:
-    arr = time_prep_re.findall(text)
-    for time_preposition_str in arr:
-        time_preposition_str = " " + time_preposition_str[1] + " "
-
-        repl = prepositions_re.sub(" в ", time_preposition_str)
-
-        text = text.replace(time_preposition_str, repl)
-
-    return text
-
-
 def pre_parse(text: str) -> str:
     text = spaces_re.sub(" ", text).strip()
-    # text = pre_re.sub(" в ", text)
 
-    if pre_check_re.search(text) is not None:
-        text = pre_begin_re.sub(" в ", text, 1)
+    text = time_prep_re.sub(r'\1в\3', text)
 
-    text = time_prep_transform(text)
+    text = spaces_re.sub(" ", text).strip()
 
-    text = spaces_re.sub(" ", text)
-
-    return text.strip()
+    return text
 
 
 def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
