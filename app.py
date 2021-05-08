@@ -14,11 +14,11 @@ start_re = re.compile(r"\s+(начиная с|начиная в|начиная|�
 prepositions_re = re.compile(r"\s+(начиная с|начиная|с|в|до|по)\s+", re.IGNORECASE)
 prepositions_in_end_cleanup_re = re.compile(r"\s+(начиная с|начиная|с|в|на|до|по)$", re.IGNORECASE)
 
-days_re = re.compile(r"\s+(позавчера|вчера|сегодня|завтра|послезавтра)\s+", re.IGNORECASE)
+days_re = re.compile(r"(?:^|\s)(позавчера|вчера|сегодня|завтра|послезавтра)(?:\s|$)", re.IGNORECASE)
 
 spaces_re = re.compile(r"\s+")
 
-time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|на)(\s+\d{1,2}:\d{1,2})", re.IGNORECASE)
+time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|в|на)(\s+\d{1,2}:\d{1,2})", re.IGNORECASE)
 
 
 def get_text_and_timezone(json_text: dict) -> (str, str):
@@ -31,20 +31,44 @@ def get_text_and_timezone(json_text: dict) -> (str, str):
     return text, timezone_str
 
 
-def pre_parse(text: str) -> str:
+def pre_parse(text: str, timezone_str: str) -> str:
     text = spaces_re.sub(" ", text).strip()
 
-    text = time_prep_re.sub(r'\1в\3', text)
+    text = time_prep_re.sub(r"\1 в \3", text)
+
+    text = yesterday_today_tomorrow_transform(text, timezone_str)
 
     text = spaces_re.sub(" ", text).strip()
 
     return text
 
 
-def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
-    text = pre_parse(text)
+def yesterday_today_tomorrow_transform(text: str, timezone_str: str) -> str:
+    # nickeskov: check if we can perform transformation
+    if time_prep_re.search(text) is None:
+        return text
 
+    day_match = days_re.search(text)
+    if day_match is None:
+        return text
+
+    # nickeskov: extract day word from regex match
+    day_word = day_match.group(0)
+
+    day_datetime = dateparser.parse(day_word, settings={'TIMEZONE': timezone_str})
+    if day_datetime is None:
+        return text
+
+    text = days_re.sub(r" ", text)
+    text = time_prep_re.sub(rf"\1 {day_word} \2\3", text)
+
+    return text
+
+
+def parse_date(text: str, parsed_tz: datetime.tzinfo) -> dict:
     timezone_str = parsed_tz.tzname(datetime.datetime.now())
+
+    text = pre_parse(text, timezone_str)
 
     dates = dateparser.search.search_dates(text, settings={'TIMEZONE': timezone_str})
     if dates is None:
@@ -196,7 +220,7 @@ def parse_date_from_text():
                    "error_description": f"invalid timezone '{timezone_str}'"
                }, 400
 
-    text = pre_parse(text)
+    text = pre_parse(text, timezone_str)
     text = date_prepositions_re.sub(" в ", text)
     text = transform_midday_midnight(text)
 
