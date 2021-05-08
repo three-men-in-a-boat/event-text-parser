@@ -1,0 +1,13 @@
+[Unit]
+Description=CalendarBot event parsing API
+After=network.target
+
+[Service]
+Type=simple
+User=centos
+Group=centos
+WorkingDirectory=/home/centos/event-text-parser
+ExecStart=/usr/local/bin/uwsgi --socket 127.0.0.1:5000 --protocol http --processes 1 --virtualenv venv --ini uwsgi.ini
+
+[Install]
+WantedBy=multi-user.target
