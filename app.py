@@ -18,7 +18,7 @@ days_re = re.compile(r"(?:^|\s)(позавчера|вчера|сегодня|з�
 
 spaces_re = re.compile(r"\s+")
 
-time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|в|на)(\s+\d{1,2}:\d{1,2})", re.IGNORECASE)
+time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|в|на|\s*)(\s+\d{1,2}:\d{1,2})", re.IGNORECASE)
 time_interval_dash_re = re.compile(r"(?:^|\s)(\d{1,2}:\d{1,2})\s*[-—]+\s*(\d{1,2}:\d{1,2})(?:\s|$)")
 
 
