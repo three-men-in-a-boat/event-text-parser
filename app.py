@@ -19,6 +19,7 @@ days_re = re.compile(r"(?:^|\s)(позавчера|вчера|сегодня|з�
 spaces_re = re.compile(r"\s+")
 
 time_prep_re = re.compile(r"(^|\s)(начиная с|начиная|с|в|на)(\s+\d{1,2}:\d{1,2})", re.IGNORECASE)
+time_interval_dash_re = re.compile(r"(?:^|\s)(\d{1,2}:\d{1,2})\s*[-—]+\s*(\d{1,2}:\d{1,2})(?:\s|$)")
 
 
 def get_text_and_timezone(json_text: dict) -> (str, str):
@@ -33,6 +34,8 @@ def get_text_and_timezone(json_text: dict) -> (str, str):
 
 def pre_parse(text: str, timezone_str: str) -> str:
     text = spaces_re.sub(" ", text).strip()
+
+    text = time_interval_dash_re.sub(r" \1 до \2 ", text)
 
     text = time_prep_re.sub(r"\1 в \3", text)
 
